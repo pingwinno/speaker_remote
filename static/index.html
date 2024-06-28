@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .slidecontainer {
+            width: 100%;
+        }
+
+        .slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 25px;
+            background: #d3d3d3;
+            outline: none;
+            opacity: 0.7;
+            -webkit-transition: .2s;
+            transition: opacity .2s;
+        }
+
+        .slider:hover {
+            opacity: 1;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            background: #04AA6D;
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            background: #04AA6D;
+            cursor: pointer;
+        }
+
+        .toggle {
+            position: relative;
+            display: inline-block;
+            width: 100px;
+            height: 52px;
+            background-color: red;
+            border-radius: 30px;
+            border: 2px solid gray;
+        }
+
+        /* After slide changes */
+        .toggle:after {
+            content: '';
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: gray;
+            top: 1px;
+            left: 1px;
+            transition: all 0.5s;
+        }
+
+        /* Toggle text */
+        p {
+            font-family: Arial, Helvetica, sans-serif;
+            font-weight: bold;
+        }
+
+        /* Checkbox checked effect */
+        .checkbox:checked + .toggle::after {
+            left: 49px;
+        }
+
+        /* Checkbox checked toggle label bg color */
+        .checkbox:checked + .toggle {
+            background-color: green;
+        }
+
+        /* Checkbox vanished */
+        .checkbox {
+            display: none;
+        }
+
+        /* Style the buttons that are used to open and close the accordion panel */
+        .accordion {
+            background-color: #eee;
+            color: #444;
+            cursor: pointer;
+            padding: 18px;
+            width: 100%;
+            text-align: left;
+            border: none;
+            outline: none;
+            transition: 0.4s;
+        }
+
+        /* Add a background color to the button if it is clicked on (add the .active class with JS), and when you move the mouse over it (hover) */
+        .active, .accordion:hover {
+            background-color: #ccc;
+        }
+
+        /* Style the accordion panel. Note: hidden by default */
+        .panel {
+            padding: 0 18px;
+            background-color: white;
+            display: none;
+            overflow: hidden;
+        }
+
+        .btn {
+            border: none;
+            background-color: inherit;
+            padding: 14px 28px;
+            font-size: 16px;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        /* Green */
+        .success {
+            color: green;
+        }
+
+        .selected {
+            background-color: green;
+            color: white;
+        }
+
+        /* Blue */
+        .info {
+            color: dodgerblue;
+        }
+
+        .info:hover {
+            background: #2196F3;
+            color: white;
+        }
+
+        /* Orange */
+        .warning {
+            color: orange;
+        }
+
+        .warning:hover {
+            background: #ff9800;
+            color: white;
+        }
+
+        /* Red */
+        .danger {
+            color: red;
+        }
+
+        .danger:hover {
+            background: #f44336;
+            color: white;
+        }
+
+        /* Gray */
+        .inactive {
+            background: #e7e7e7;
+            color: black;
+        }
+    </style>
+</head>
+<script type="text/javascript">
+
+    window.onload = function () {
+        var acc = document.getElementsByClassName("accordion");
+        var i;
+
+        for (i = 0; i < acc.length; i++) {
+            acc[i].addEventListener("click", function () {
+                /* Toggle between adding and removing the "active" class,
+                to highlight the button that controls the panel */
+                this.classList.toggle("active");
+
+                /* Toggle between hiding and showing the active panel */
+                var panel = this.nextElementSibling;
+                if (panel.style.display === "block") {
+                    panel.style.display = "none";
+                } else {
+                    panel.style.display = "block";
+                }
+            });
+        }
+        let webSocket = new WebSocket(window.location + "ws");
+        webSocket.onopen = (event) => {
+        };
+        webSocket.onmessage = (event) => {
+            localStorage.clear()
+            console.log(event.data);
+            const msg = JSON.parse(event.data);
+            document.getElementById("enabled").checked = msg.enabled
+            document.getElementById("volume").value = msg.volume
+            let selectedInput = msg.input
+            switch (selectedInput) {
+                case 0:
+                    document.getElementById("pc").className = "btn selected"
+                    document.getElementById("cd").className = "btn inactive"
+                    document.getElementById("digital").className = "btn inactive"
+                    break;
+                case 1:
+                    document.getElementById("pc").className = "btn inactive"
+                    document.getElementById("cd").className = "btn selected"
+                    document.getElementById("digital").className = "btn inactive"
+                    break;
+                case 2:
+                    document.getElementById("pc").className = "btn inactive"
+                    document.getElementById("cd").className = "btn inactive"
+                    document.getElementById("digital").className = "btn selected"
+                    break;
+                default:
+                    console.log("а та похуй що тут")
+                    break;
+            }
+            document.getElementById("sw").value = msg.sw
+            document.getElementById("bass").value = msg.bass
+            document.getElementById("treble").value = msg.treble
+            document.getElementById("balance").value = msg.balance
+
+        };
+        document.getElementById("enabled").addEventListener("input", setEnabled)
+        document.getElementById("volume").addEventListener("input", setVolume)
+        document.getElementById("sw").addEventListener("input", setSw)
+        document.getElementById("bass").addEventListener("input", setBass)
+        document.getElementById("treble").addEventListener("input", setTreble)
+        document.getElementById("balance").addEventListener("input", setBalance)
+        document.getElementById("balance").addEventListener("input", setBalance)
+        document.getElementById("pc").addEventListener("click", selectPcInput)
+        document.getElementById("cd").addEventListener("click", selectCdInput)
+        document.getElementById("digital").addEventListener("click", selectDigitalInput)
+
+
+        function setEnabled() {
+            const msg = {
+                enabled: Number(this.checked)
+            };
+            webSocket.send(JSON.stringify(msg))
+        }
+
+        function setVolume() {
+            const msg = {
+                volume: Number(this.value)
+            };
+            webSocket.send(JSON.stringify(msg))
+        }
+
+        function setInput() {
+            const msg = {
+                input: Number(this.value)
+            }
+            webSocket.send(JSON.stringify(msg))
+        }
+
+        function setSw() {
+            const msg = {
+                sw: Number(this.value)
+            }
+            webSocket.send(JSON.stringify(msg))
+        }
+
+        function setBass() {
+            const msg = {
+                bass: Number(this.value)
+            }
+            webSocket.send(JSON.stringify(msg))
+        }
+
+        function setBalance() {
+            const msg = {
+                balance: Number(this.value)
+            }
+            webSocket.send(JSON.stringify(msg))
+        }
+
+        function setTreble() {
+            const msg = {
+                treble: Number(this.value)
+            }
+            webSocket.send(JSON.stringify(msg))
+        }
+
+        function selectPcInput() {
+            const msg = {
+                input: Number(this.value)
+            }
+            webSocket.send(JSON.stringify(msg))
+        }
+
+        function selectCdInput() {
+            const msg = {
+                input: Number(this.value)
+            }
+            webSocket.send(JSON.stringify(msg))
+        }
+
+        function selectDigitalInput() {
+            const msg = {
+                input: Number(this.value)
+            }
+            webSocket.send(JSON.stringify(msg))
+        }
+
+    }
+</script>
+<body>
+
+<h1>Speaker control</h1>
+<button class="btn selected" id="pc" value=0>PC</button>
+<button class="btn inactive" id="cd" value=1>CD</button>
+<button class="btn inactive" id="digital" value=2>DIGITAL</button>
+
+
+<div class="slidecontainer">
+    <p>enabled:</p>
+    <input type="checkbox"
+           id="enabled"
+           class="checkbox"/>
+    <label for="enabled"
+           class="toggle">
+    </label>
+    <p>volume:</p>
+    <input type="range" min=1 max=57 value=1 class="slider" id="volume">
+    <button class="accordion">Additional settings</button>
+    <div class="panel">
+        <p>sw:</p>
+        <input type="range" min=-10 max=10 value=0 class="slider" id="sw">
+        <p>bass:</p>
+        <input type="range" min=-10 max=10 value=0 class="slider" id="bass">
+        <p>treble:</p>
+        <input type="range" min=-10 max=10 value=0 class="slider" id="treble">
+        <p>balance:</p>
+        <input type="range" min=-10 max=10 value=0 class="slider" id="balance">
+    </div>
+
+</div>
+
+</body>
+</html>
