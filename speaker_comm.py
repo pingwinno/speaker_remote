@@ -117,6 +117,8 @@ async def enable():
 
     increase_volume(min_volume, settings.volume)
 
+    set_input(settings.input)
+
     settings.enabled = 1
     print("enabled")
     return 1
