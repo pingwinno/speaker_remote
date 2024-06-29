@@ -200,6 +200,7 @@
             console.log(event.data);
             const msg = JSON.parse(event.data);
             document.getElementById("enabled").checked = msg.enabled
+            hideSettings(msg.enabled)
             document.getElementById("volume").value = msg.volume
             let selectedInput = msg.input
             switch (selectedInput) {
@@ -241,6 +242,7 @@
 
 
         function setEnabled() {
+            hideSettings(this.checked)
             const msg = {
                 enabled: Number(this.checked)
             };
@@ -310,6 +312,14 @@
             webSocket.send(JSON.stringify(msg))
         }
 
+        function hideSettings(isEnabled){
+             if(isEnabled){
+                document.getElementById("settingsBlock").hidden = false
+            }else{
+                document.getElementById("settingsBlock").hidden = true
+            }
+        }
+
     }
 </script>
 <body>
@@ -319,15 +329,15 @@
 <button class="btn inactive" id="cd" value=1>CD</button>
 <button class="btn inactive" id="digital" value=2>DIGITAL</button>
 
+<p>enabled:</p>
+<input type="checkbox"
+       id="enabled"
+       class="checkbox"/>
+<label for="enabled"
+       class="toggle">
+</label>
 
-<div class="slidecontainer">
-    <p>enabled:</p>
-    <input type="checkbox"
-           id="enabled"
-           class="checkbox"/>
-    <label for="enabled"
-           class="toggle">
-    </label>
+<div class="slidecontainer" id="settingsBlock">
     <p>volume:</p>
     <input type="range" min=1 max=56 value=1 class="slider" id="volume">
     <button class="accordion">Additional settings</button>
