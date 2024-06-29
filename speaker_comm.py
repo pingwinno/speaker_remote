@@ -1,7 +1,15 @@
+import atexit
+import logging
 import os
 import pickle
+import time
+
+import RPi.GPIO as GPIO
+import smbus2
 
 import settings
+
+logging.getLogger().setLevel(logging.INFO)
 
 stby = 27
 mute = 17
@@ -20,7 +28,50 @@ real_volume = [
     21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6
 ]
 
+sw_positive_offset = [-59, -60, -61, -62, -63, -64]
+
+sw_negative_offset = [-49, -50, -51, -52, -53, -54, -55, -56, -57, -58, -59]
+
+inputs = [
+    0b01000100, 0b01000101, 0b01000110
+]
+
 settings = settings.Settings()
+
+if os.path.exists("settings.bin"):
+    with open('settings.bin', 'rb') as inp:
+        settings = pickle.load(inp)
+
+try:
+    GPIO.setmode(GPIO.BCM)
+
+    GPIO.setup(stby, GPIO.OUT)
+    GPIO.setup(mute, GPIO.OUT)
+
+    GPIO.output(stby, GPIO.LOW)
+    GPIO.output(mute, GPIO.LOW)
+
+    bus = smbus2.SMBus(1)
+    logging.info("Starting remote amp...")
+    GPIO.output(stby, GPIO.HIGH)
+    logging.info("Initializing bus...")
+    time.sleep(1)
+
+    response = bus.write_quick(DEVICE_ADDRESS)
+    if response is not None:
+        GPIO.output(mute, GPIO.LOW)
+        GPIO.output(stby, GPIO.LOW)
+        raise OSError
+    else:
+        logging.info("Initialization complete")
+except OSError:
+    logging.error("Speaker initialization failed")
+    GPIO.output(mute, GPIO.LOW)
+    GPIO.output(stby, GPIO.LOW)
+    raise OSError
+finally:
+    GPIO.output(mute, GPIO.LOW)
+    GPIO.output(stby, GPIO.LOW)
 
 if os.path.exists("settings/settings.bin"):
     with open('settings/settings.bin', 'rb') as inp:
@@ -28,37 +79,98 @@ if os.path.exists("settings/settings.bin"):
         print(settings.to_json())
 
 
-def enable():
+async def enable():
+    logging.info("Enabling speakers...")
+    GPIO.output(stby, GPIO.HIGH)
+
+    bus = smbus2.SMBus(1)
+    logging.info("Starting remote amp...")
+    GPIO.output(stby, GPIO.HIGH)
+    logging.info("Initializing bus...")
+    time.sleep(1)
+
+    bus.write_byte(DEVICE_ADDRESS, 0b10000000)
+
+    bus.write_byte(DEVICE_ADDRESS, 0b10100000)
+
+    bus.write_byte(DEVICE_ADDRESS, 0b01110111)
+
+    bus.write_byte(DEVICE_ADDRESS, 0b01100111)
+
+    bus.write_byte(DEVICE_ADDRESS, 0b11000101)
+
+    bus.write_byte(DEVICE_ADDRESS, 0b11000101)
+
+    bus.write_byte(DEVICE_ADDRESS, 0b11100101)
+
+    bus.write_byte(DEVICE_ADDRESS, 0b01000101)
+
+    bus.write_byte(DEVICE_ADDRESS, 0b01000100)
+
+    bus.write_byte(DEVICE_ADDRESS, 0b00111111)
+
+    bus.write_byte(DEVICE_ADDRESS, 0b10000000)
+
+    GPIO.output(mute, GPIO.HIGH)
+
+    time.sleep(1)
+
+    increase_volume(min_volume, settings.volume)
+
     settings.enabled = 1
-    print("enable")
+    print("enabled")
+    return 1
 
 
-def disable():
+async def disable():
+    logging.info("Shutting down remote amp...")
+    decrease_volume(settings.volume, min_volume)
+    GPIO.output(mute, GPIO.LOW)
+    GPIO.output(stby, GPIO.LOW)
     settings.enabled = 0
     print("disable")
 
 
 def set_volume(volume):
     if settings.volume < volume < max_volume:
-        for volume_step in range(settings.volume, volume):
-            print(f"volume is {real_volume[volume_step]}")
-        settings.volume = volume
-        write_settings(settings)
+        increase_volume(settings.volume, volume)
     elif settings.volume > volume > min_volume:
-        for volume_step in reversed(range(volume, settings.volume)):
-            print(f"volume is {real_volume[volume_step]}")
-        settings.volume = volume
-        write_settings(settings)
+        decrease_volume(settings.volume, volume)
+    settings.volume = volume
+    write_settings(settings)
+
+
+def increase_volume(current_volume, new_volume):
+    for volume_step in range(current_volume, new_volume):
+        print(f"volume is {real_volume[volume_step]}")
+        bus.write_byte(DEVICE_ADDRESS, real_volume[volume_step])
+
+
+def decrease_volume(current_volume, new_volume):
+    for volume_step in reversed(range(new_volume, current_volume)):
+        print(f"volume is {real_volume[volume_step]}")
+        bus.write_byte(DEVICE_ADDRESS, real_volume[volume_step])
 
 
 def set_input(input):
     print(f"input is {input}")
+    bus.write_byte(DEVICE_ADDRESS, inputs[input])
     settings.input = input
     write_settings(settings)
 
 
 def set_sw(sw):
-    print(f"sw is {sw}")
+    for volume_step in range(settings.sw, sw):
+        if sw > 0 and (volume_step % 2) == 0:
+            print(f"volume is {sw_positive_offset[volume_step // 2]}")
+            settings.volume = sw
+            write_settings(settings)
+        else:
+            for volume_step in reversed(range(sw, settings.sw)):
+                print(f"volume is {sw_negative_offset[volume_step]}")
+            settings.volume = sw
+            write_settings(settings)
+            print(f"sw is {sw}")
     settings.sw = sw
     write_settings(settings)
 
@@ -88,3 +200,10 @@ def write_settings(saved_settings):
 
 def get_settings():
     return settings
+
+
+def exit_handler():
+    disable()
+
+
+atexit.register(exit_handler)
