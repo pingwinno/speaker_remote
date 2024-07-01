@@ -18,8 +18,8 @@ DEVICE_ADDRESS = 68
 max_volume = 57
 min_volume = 0
 
-max_offset = 10
-min_offset = -10
+max_sw = 16
+min_sw = 0
 
 real_volume = [
     63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50,
@@ -28,9 +28,7 @@ real_volume = [
     21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6
 ]
 
-sw_positive_offset = [-59, -60, -61, -62, -63, -64]
-
-sw_negative_offset = [-49, -50, -51, -52, -53, -54, -55, -56, -57, -58, -59]
+sw_negative_offset = [-49, -50, -51, -52, -53, -54, -55, -56, -57, -58, -59, -60, -61, -62, -63, -64]
 
 inputs = [
     0b01000100, 0b01000101, 0b01000110
@@ -74,9 +72,12 @@ finally:
     GPIO.output(stby, GPIO.LOW)
 
 if os.path.exists("settings/settings.bin"):
-    with open('settings/settings.bin', 'rb') as inp:
-        settings = pickle.load(inp)
-        print(settings.to_json())
+    try:
+        with open('settings/settings.bin', 'rb') as inp:
+            settings = pickle.load(inp)
+            print(settings.to_json())
+    except EOFError:
+        os.remove("settings/settings.bin")
 
 
 async def enable():
@@ -134,47 +135,52 @@ async def disable():
 
 
 def set_volume(volume):
+    logging.info(f"Changing volume to {volume}")
     if settings.volume < volume < max_volume:
-        increase_volume(settings.volume, volume)
+        increase_volume(settings.volume, volume, real_volume)
     elif settings.volume > volume > min_volume:
         decrease_volume(settings.volume, volume)
     settings.volume = volume
     write_settings(settings)
+    logging.info(f"Volume has been changed to {volume}")
 
 
-def increase_volume(current_volume, new_volume):
+
+def increase_volume(current_volume, new_volume, values_list):
+    logging.info(f"Increasing volume from {current_volume} to {new_volume}")
     for volume_step in range(current_volume, new_volume):
-        print(f"volume is {real_volume[volume_step]}")
-        bus.write_byte(DEVICE_ADDRESS, real_volume[volume_step])
+        logging.debug(f"value is {values_list[volume_step]}")
+        bus.write_byte(DEVICE_ADDRESS, values_list[volume_step])
+    logging.info(f"Volume has been increased from {current_volume} to {new_volume}")
 
 
-def decrease_volume(current_volume, new_volume):
+def decrease_volume(current_volume, new_volume, values_list):
+    logging.info(f"Decreasing volume from {current_volume} to {new_volume}")
     for volume_step in reversed(range(new_volume, current_volume)):
-        print(f"volume is {real_volume[volume_step]}")
-        bus.write_byte(DEVICE_ADDRESS, real_volume[volume_step])
+        logging.debug(f"value is {values_list[volume_step]}")
+        bus.write_byte(DEVICE_ADDRESS, values_list[volume_step])
+    logging.info(f"Volume has been decreased from {current_volume} to {new_volume}")
 
 
 def set_input(input):
-    print(f"input is {input}")
+    logging.info(f"Setting input is {input}")
     bus.write_byte(DEVICE_ADDRESS, inputs[input])
     settings.input = input
     write_settings(settings)
+    logging.info(f"Input has been set to {input}")
+
 
 
 def set_sw(sw):
-    for volume_step in range(settings.sw, sw):
-        if sw > 0 and (volume_step % 2) == 0:
-            print(f"volume is {sw_positive_offset[volume_step // 2]}")
-            settings.volume = sw
-            write_settings(settings)
-        else:
-            for volume_step in reversed(range(sw, settings.sw)):
-                print(f"volume is {sw_negative_offset[volume_step]}")
-            settings.volume = sw
-            write_settings(settings)
-            print(f"sw is {sw}")
-    settings.sw = sw
+    logging.info(f"Changing SW to {sw}")
+    if settings.sw < sw < max_volume:
+        increase_volume(settings.volume, sw, s)
+    elif settings.volume > sw > min_volume:
+        decrease_volume(settings.volume, sw)
+    settings.volume = sw
     write_settings(settings)
+    logging.info(f"SW has been changed to {sw}")
+
 
 
 def set_bass(bass):
