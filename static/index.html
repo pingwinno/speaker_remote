@@ -173,7 +173,8 @@
 </head>
 <script type="text/javascript">
 
-    window.onopen = function () {
+
+    window.onload = function () {
         var acc = document.getElementsByClassName("accordion");
         var i;
 
@@ -192,10 +193,11 @@
                 }
             });
         }
-        let webSocket = new WebSocket(window.location + "ws");
-        webSocket.onopen = (event) => {
+        let ws = new WebSocket(window.location + "ws");
+
+        ws.onopen = (event) => {
         };
-        webSocket.onmessage = (event) => {
+        ws.onmessage = (event) => {
             localStorage.clear()
             console.log(event.data);
             const msg = JSON.parse(event.data);
@@ -233,7 +235,7 @@
         ws.onclose = function (e) {
             console.log('Socket is closed. Reconnect will be attempted in 1 second.', e.reason);
             setTimeout(function () {
-                connect();
+                this.open(window.location + "ws")
             }, 1000);
         };
 
@@ -241,6 +243,7 @@
             console.error('Socket encountered error: ', err.message, 'Closing socket');
             ws.close();
         };
+
 
         document.getElementById("enabled").addEventListener("input", setEnabled)
         document.getElementById("volume").addEventListener("input", setVolume)
@@ -259,78 +262,74 @@
             const msg = {
                 enabled: Number(this.checked)
             };
-            webSocket.send(JSON.stringify(msg))
+            ws.send(JSON.stringify(msg))
         }
 
         function setVolume() {
             const msg = {
                 volume: Number(this.value)
             };
-            webSocket.send(JSON.stringify(msg))
+            ws.send(JSON.stringify(msg))
         }
 
         function setInput() {
             const msg = {
                 input: Number(this.value)
             }
-            webSocket.send(JSON.stringify(msg))
+            ws.send(JSON.stringify(msg))
         }
 
         function setSw() {
             const msg = {
                 sw: Number(this.value)
             }
-            webSocket.send(JSON.stringify(msg))
+            ws.send(JSON.stringify(msg))
         }
 
         function setBass() {
             const msg = {
                 bass: Number(this.value)
             }
-            webSocket.send(JSON.stringify(msg))
+            ws.send(JSON.stringify(msg))
         }
 
         function setBalance() {
             const msg = {
                 balance: Number(this.value)
             }
-            webSocket.send(JSON.stringify(msg))
+            ws.send(JSON.stringify(msg))
         }
 
         function setTreble() {
             const msg = {
                 treble: Number(this.value)
             }
-            webSocket.send(JSON.stringify(msg))
+            ws.send(JSON.stringify(msg))
         }
 
         function selectPcInput() {
             const msg = {
                 input: Number(this.value)
             }
-            webSocket.send(JSON.stringify(msg))
+            ws.send(JSON.stringify(msg))
         }
 
         function selectCdInput() {
             const msg = {
                 input: Number(this.value)
             }
-            webSocket.send(JSON.stringify(msg))
+            ws.send(JSON.stringify(msg))
         }
 
         function selectDigitalInput() {
             const msg = {
                 input: Number(this.value)
             }
-            webSocket.send(JSON.stringify(msg))
+            ws.send(JSON.stringify(msg))
         }
 
         function hideSettings(isEnabled) {
-            if (isEnabled) {
-                document.getElementById("settingsBlock").hidden = false
-            } else {
-                document.getElementById("settingsBlock").hidden = true
-            }
+            document.getElementById("settingsBlock").hidden = !isEnabled;
         }
 
     }
