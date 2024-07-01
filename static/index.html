@@ -173,7 +173,7 @@
 </head>
 <script type="text/javascript">
 
-    window.onfocus = function () {
+    window.onopen = function () {
         var acc = document.getElementsByClassName("accordion");
         var i;
 
@@ -229,6 +229,19 @@
             document.getElementById("balance").value = msg.balance
 
         };
+
+        ws.onclose = function (e) {
+            console.log('Socket is closed. Reconnect will be attempted in 1 second.', e.reason);
+            setTimeout(function () {
+                connect();
+            }, 1000);
+        };
+
+        ws.onerror = function (err) {
+            console.error('Socket encountered error: ', err.message, 'Closing socket');
+            ws.close();
+        };
+
         document.getElementById("enabled").addEventListener("input", setEnabled)
         document.getElementById("volume").addEventListener("input", setVolume)
         document.getElementById("sw").addEventListener("input", setSw)
@@ -312,10 +325,10 @@
             webSocket.send(JSON.stringify(msg))
         }
 
-        function hideSettings(isEnabled){
-             if(isEnabled){
+        function hideSettings(isEnabled) {
+            if (isEnabled) {
                 document.getElementById("settingsBlock").hidden = false
-            }else{
+            } else {
                 document.getElementById("settingsBlock").hidden = true
             }
         }
