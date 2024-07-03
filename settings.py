@@ -14,7 +14,7 @@ class Settings:
         self.enabled =0
         self.volume = 0
         self.input = 0
-        self.sw = 0
+        self.sw = 10
         self.treble = 0
         self.bass = 0
         self.balance = 0

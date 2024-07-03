@@ -11,10 +11,6 @@ from speaker_comm import settings
 
 connections = []
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
 app = FastAPI()
 
 
@@ -23,6 +19,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         await websocket.accept()
         connections.append(websocket)
+
         await websocket.send_text(settings.to_json())
         while True:
             data = await websocket.receive_text()
@@ -39,8 +36,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 enabled = json_body['enabled']
                 logging.info(f"Enabled is : {enabled}")
                 if enabled == 1:
-                    await speaker_comm.enable()
-                    await asyncio.sleep(2)
+                    while speaker_comm.enable() != 1:
+                        await asyncio.sleep(1)
                 if enabled == 0:
                     await speaker_comm.disable()
                     await asyncio.sleep(2)

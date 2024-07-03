@@ -1,25 +1,25 @@
-import atexit
 import logging
 import os
 import pickle
 import time
 
 import RPi.GPIO as GPIO
-import smbus2
 
+import I2C_bus
 import settings
 
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.DEBUG)
 
-stby = 27
-mute = 17
 DEVICE_ADDRESS = 68
-
 max_volume = 57
 min_volume = 0
 
 max_sw = 16
+default_sw = 10
 min_sw = 0
+
+rear_right_channel_sw_addr = 0b11000000
+rear_left_channel_sw_addr = 0b11100000
 
 real_volume = [
     63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50,
@@ -28,48 +28,16 @@ real_volume = [
     21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6
 ]
 
-sw_negative_offset = [-49, -50, -51, -52, -53, -54, -55, -56, -57, -58, -59, -60, -61, -62, -63, -64]
+sw_values = [0b00001111, 0b00001110, 0b00001101, 0b00001100, 0b00001011, 0b00001010, 0b00001001, 0b00001000, 0b00000111,
+             0b00000110, 0b00000101, 0b00000100, 0b00000011, 0b00000010, 0b00000001, 0b00000000]
 
 inputs = [
     0b01000100, 0b01000101, 0b01000110
 ]
 
+i2c_bus_init = I2C_bus.I2CBus_init()
+bus = i2c_bus_init.bus
 settings = settings.Settings()
-
-if os.path.exists("settings.bin"):
-    with open('settings.bin', 'rb') as inp:
-        settings = pickle.load(inp)
-
-try:
-    GPIO.setmode(GPIO.BCM)
-
-    GPIO.setup(stby, GPIO.OUT)
-    GPIO.setup(mute, GPIO.OUT)
-
-    GPIO.output(stby, GPIO.LOW)
-    GPIO.output(mute, GPIO.LOW)
-
-    bus = smbus2.SMBus(1)
-    logging.info("Starting remote amp...")
-    GPIO.output(stby, GPIO.HIGH)
-    logging.info("Initializing bus...")
-    time.sleep(1)
-
-    response = bus.write_quick(DEVICE_ADDRESS)
-    if response is not None:
-        GPIO.output(mute, GPIO.LOW)
-        GPIO.output(stby, GPIO.LOW)
-        raise OSError
-    else:
-        logging.info("Initialization complete")
-except OSError:
-    logging.error("Speaker initialization failed")
-    GPIO.output(mute, GPIO.LOW)
-    GPIO.output(stby, GPIO.LOW)
-    raise OSError
-finally:
-    GPIO.output(mute, GPIO.LOW)
-    GPIO.output(stby, GPIO.LOW)
 
 if os.path.exists("settings/settings.bin"):
     try:
@@ -80,43 +48,39 @@ if os.path.exists("settings/settings.bin"):
         os.remove("settings/settings.bin")
 
 
-async def enable():
-    logging.info("Enabling speakers...")
-    GPIO.output(stby, GPIO.HIGH)
+def enable():
+    while i2c_bus_init.isInit is not True:
+        time.sleep(0.5)
 
-    bus = smbus2.SMBus(1)
-    logging.info("Starting remote amp...")
-    GPIO.output(stby, GPIO.HIGH)
-    logging.info("Initializing bus...")
-    time.sleep(1)
+    GPIO.output(I2C_bus.stby_pin, GPIO.HIGH)
 
+    time.sleep(2)
+
+    # front attenuation set to 0
     bus.write_byte(DEVICE_ADDRESS, 0b10000000)
-
     bus.write_byte(DEVICE_ADDRESS, 0b10100000)
 
-    bus.write_byte(DEVICE_ADDRESS, 0b01110111)
-
-    bus.write_byte(DEVICE_ADDRESS, 0b01100111)
-
+    # sw attenuation set to -6.25dB
     bus.write_byte(DEVICE_ADDRESS, 0b11000101)
-
-    bus.write_byte(DEVICE_ADDRESS, 0b11000101)
-
     bus.write_byte(DEVICE_ADDRESS, 0b11100101)
 
-    bus.write_byte(DEVICE_ADDRESS, 0b01000101)
+    # bass and treble set to 0
+    bus.write_byte(DEVICE_ADDRESS, 0b01110111)
+    bus.write_byte(DEVICE_ADDRESS, 0b01100111)
 
+    # set input to 0
     bus.write_byte(DEVICE_ADDRESS, 0b01000100)
 
+    # set volume to -80dB
     bus.write_byte(DEVICE_ADDRESS, 0b00111111)
 
-    bus.write_byte(DEVICE_ADDRESS, 0b10000000)
-
-    GPIO.output(mute, GPIO.HIGH)
+    GPIO.output(I2C_bus.mute_pin, GPIO.HIGH)
 
     time.sleep(1)
 
-    increase_volume(min_volume, settings.volume)
+    increase_volume(min_volume, settings.volume, real_volume)
+
+    set_sw(default_sw)
 
     set_input(settings.input)
 
@@ -125,11 +89,11 @@ async def enable():
     return 1
 
 
-async def disable():
+def disable():
     logging.info("Shutting down remote amp...")
-    decrease_volume(settings.volume, min_volume)
-    GPIO.output(mute, GPIO.LOW)
-    GPIO.output(stby, GPIO.LOW)
+    decrease_volume(settings.volume, min_volume, real_volume)
+    GPIO.output(I2C_bus.mute_pin, GPIO.LOW)
+    GPIO.output(I2C_bus.stby_pin, GPIO.LOW)
     settings.enabled = 0
     print("disable")
 
@@ -138,12 +102,11 @@ def set_volume(volume):
     logging.info(f"Changing volume to {volume}")
     if settings.volume < volume < max_volume:
         increase_volume(settings.volume, volume, real_volume)
-    elif settings.volume > volume > min_volume:
-        decrease_volume(settings.volume, volume)
+    elif settings.volume > volume >= min_volume:
+        decrease_volume(settings.volume, volume, real_volume)
     settings.volume = volume
     write_settings(settings)
     logging.info(f"Volume has been changed to {volume}")
-
 
 
 def increase_volume(current_volume, new_volume, values_list):
@@ -162,6 +125,24 @@ def decrease_volume(current_volume, new_volume, values_list):
     logging.info(f"Volume has been decreased from {current_volume} to {new_volume}")
 
 
+def increase_sw_volume(current_volume, new_volume, values_list):
+    logging.info(f"Increasing sw from {current_volume} to {new_volume}")
+    for volume_step in range(current_volume, new_volume):
+        logging.debug(f"value is {values_list[volume_step]}")
+        bus.write_byte(DEVICE_ADDRESS, rear_right_channel_sw_addr | values_list[volume_step])
+        bus.write_byte(DEVICE_ADDRESS, rear_left_channel_sw_addr | values_list[volume_step])
+    logging.info(f"SW has been increased from {current_volume} to {new_volume}")
+
+
+def decrease_sw_volume(current_volume, new_volume, values_list):
+    logging.info(f"Decreasing sw from {current_volume} to {new_volume}")
+    for volume_step in reversed(range(new_volume, current_volume)):
+        logging.debug(f"value is {values_list[volume_step]}")
+        bus.write_byte(DEVICE_ADDRESS, rear_right_channel_sw_addr | values_list[volume_step])
+        bus.write_byte(DEVICE_ADDRESS, rear_left_channel_sw_addr | values_list[volume_step])
+    logging.info(f"SW has been decreased from {current_volume} to {new_volume}")
+
+
 def set_input(input):
     logging.info(f"Setting input is {input}")
     bus.write_byte(DEVICE_ADDRESS, inputs[input])
@@ -170,17 +151,17 @@ def set_input(input):
     logging.info(f"Input has been set to {input}")
 
 
-
 def set_sw(sw):
     logging.info(f"Changing SW to {sw}")
-    if settings.sw < sw < max_volume:
-        increase_volume(settings.volume, sw, s)
-    elif settings.volume > sw > min_volume:
-        decrease_volume(settings.volume, sw)
-    settings.volume = sw
+    if settings.sw < sw < max_sw:
+        logging.debug("Increasing sw volume")
+        increase_sw_volume(settings.sw, sw, sw_values)
+    elif settings.sw > sw >= min_sw:
+        logging.debug("Decreasing sw volume")
+        decrease_sw_volume(settings.sw, sw, sw_values)
+    settings.sw = sw
     write_settings(settings)
     logging.info(f"SW has been changed to {sw}")
-
 
 
 def set_bass(bass):
@@ -208,10 +189,3 @@ def write_settings(saved_settings):
 
 def get_settings():
     return settings
-
-
-def exit_handler():
-    disable()
-
-
-atexit.register(exit_handler)
