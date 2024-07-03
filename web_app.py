@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 
@@ -38,9 +39,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 enabled = json_body['enabled']
                 logging.info(f"Enabled is : {enabled}")
                 if enabled == 1:
-                    speaker_comm.enable()
+                    await speaker_comm.enable()
+                    await asyncio.sleep(2)
                 if enabled == 0:
-                    speaker_comm.disable()
+                    await speaker_comm.disable()
+                    await asyncio.sleep(2)
             if 'volume' in json_body and json_body['volume'] is not None:
                 volume = json_body['volume']
                 logging.info(f"Volume is : {volume}")

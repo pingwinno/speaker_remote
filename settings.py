@@ -19,5 +19,13 @@ class Settings:
         self.bass = 0
         self.balance = 0
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["enabled"]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.enabled = 0
     def to_json(self):
         return json.dumps(self.__dict__)
