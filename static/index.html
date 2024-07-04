@@ -124,43 +124,13 @@
             display: inline-block;
         }
 
-        /* Green */
-        .success {
-            color: green;
-        }
-
         .selected {
             background-color: green;
             color: white;
         }
 
-        /* Blue */
-        .info {
-            color: dodgerblue;
-        }
-
         .info:hover {
             background: #2196F3;
-            color: white;
-        }
-
-        /* Orange */
-        .warning {
-            color: orange;
-        }
-
-        .warning:hover {
-            background: #ff9800;
-            color: white;
-        }
-
-        /* Red */
-        .danger {
-            color: red;
-        }
-
-        .danger:hover {
-            background: #f44336;
             color: white;
         }
 
@@ -169,6 +139,8 @@
             background: #e7e7e7;
             color: black;
         }
+
+
     </style>
 </head>
 <script type="text/javascript">
@@ -200,7 +172,14 @@
         ws.onmessage = (event) => {
             localStorage.clear()
             console.log(event.data);
-            const msg = JSON.parse(event.data);
+            let msg = ""
+            try {
+                msg = JSON.parse(event.data);
+            } catch (TypeError) {
+                document.getElementById("controls").hidden = true
+                document.getElementById("error_message").innerHTML = event.data
+            }
+            document.getElementById("enabled").disabled = false
             document.getElementById("enabled").checked = msg.enabled
             hideSettings(msg.enabled)
             document.getElementById("volume").value = msg.volume
@@ -235,7 +214,7 @@
         ws.onclose = function (e) {
             console.log('Socket is closed. Reconnect will be attempted in 1 second.', e.reason);
             setTimeout(function () {
-                this.open(window.location + "ws")
+                ws = new WebSocket(window.location + "ws");
             }, 1000);
         };
 
@@ -258,6 +237,8 @@
 
 
         function setEnabled() {
+            this.disabled = true;
+            this.style.setProperty("background-color", "white")
             hideSettings(this.checked)
             const msg = {
                 enabled: Number(this.checked)
@@ -269,13 +250,6 @@
             const msg = {
                 volume: Number(this.value)
             };
-            ws.send(JSON.stringify(msg))
-        }
-
-        function setInput() {
-            const msg = {
-                input: Number(this.value)
-            }
             ws.send(JSON.stringify(msg))
         }
 
@@ -336,35 +310,34 @@
 </script>
 <body>
 
-<h1>Speaker control</h1>
-<button class="btn selected" id="pc" value=0>PC</button>
-<button class="btn inactive" id="cd" value=1>CD</button>
-<button class="btn inactive" id="digital" value=2>DIGITAL</button>
+<p class="error_message" id="error_message"></p>
 
-<p>enabled:</p>
-<input type="checkbox"
-       id="enabled"
-       class="checkbox"/>
-<label for="enabled"
-       class="toggle">
-</label>
+<div id="controls">
+    <h1>Speaker control</h1>
+    <button class="btn selected" id="pc" value=0>PC</button>
+    <button class="btn inactive" id="cd" value=1>CD</button>
+    <button class="btn inactive" id="digital" value=2>DIGITAL</button>
 
-<div class="slidecontainer" id="settingsBlock">
-    <p>volume:</p>
-    <input type="range" min=1 max=56 value=1 class="slider" id="volume">
-    <button class="accordion">Additional settings</button>
-    <div class="panel">
-        <p>sw:</p>
-        <input type="range" min=0 max=15 value=10 class="slider" id="sw">
-        <p>bass:</p>
-        <input type="range" min=-10 max=10 value=0 class="slider" id="bass">
-        <p>treble:</p>
-        <input type="range" min=-10 max=10 value=0 class="slider" id="treble">
-        <p>balance:</p>
-        <input type="range" min=-10 max=10 value=0 class="slider" id="balance">
+    <p>enabled:</p>
+    <input type="checkbox" id="enabled" class="checkbox"/>
+    <label for="enabled" class="toggle"></label>
+
+    <div class="slidecontainer" id="settingsBlock">
+        <p>volume:</p>
+        <input type="range" min=1 max=56 value=1 class="slider" id="volume">
+        <button class="accordion">Additional settings</button>
+        <div class="panel">
+            <p>sw:</p>
+            <input type="range" min=0 max=15 value=10 class="slider" id="sw">
+            <p>bass:</p>
+            <input type="range" min=-10 max=10 value=0 class="slider" id="bass">
+            <p>treble:</p>
+            <input type="range" min=-10 max=10 value=0 class="slider" id="treble">
+            <p>balance:</p>
+            <input type="range" min=-10 max=10 value=0 class="slider" id="balance">
+        </div>
+
     </div>
-
 </div>
-
 </body>
 </html>

@@ -26,7 +26,7 @@ async def websocket_endpoint(websocket: WebSocket):
             json_body = {}
             try:
                 json_body = json.loads(data)
-            except ValueError:
+            except TypeError:
                 logging.error(f"Cannot handle a message: {data}")
                 await websocket.send_text("Unsupported message type")
 
@@ -36,11 +36,18 @@ async def websocket_endpoint(websocket: WebSocket):
                 enabled = json_body['enabled']
                 logging.info(f"Enabled is : {enabled}")
                 if enabled == 1:
-                    while speaker_comm.enable() != 1:
+                    if speaker_comm.enable() == 0:
+                        await websocket.send_text("Cannot enable speaker communication.\n Check hardware connection.")
                         await asyncio.sleep(1)
+                        await websocket.close()
+                        return
+                    logging.info("Waiting for speaker comm response...")
+                    logging.info(f"Send enabled : {enabled}")
                 if enabled == 0:
-                    await speaker_comm.disable()
-                    await asyncio.sleep(2)
+                    while speaker_comm.disable() != 1:
+                        await asyncio.sleep(1)
+                        logging.info("Waiting for speaker comm response...")
+                    logging.info(f"Send disabled : {enabled}")
             if 'volume' in json_body and json_body['volume'] is not None:
                 volume = json_body['volume']
                 logging.info(f"Volume is : {volume}")

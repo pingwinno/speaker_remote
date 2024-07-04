@@ -4,15 +4,18 @@ import pickle
 import time
 
 import RPi.GPIO as GPIO
+from smbus2 import smbus2
 
-import I2C_bus
 import settings
 
-logging.getLogger().setLevel(logging.DEBUG)
+logging.getLogger().setLevel(logging.INFO)
 
 DEVICE_ADDRESS = 68
 max_volume = 57
 min_volume = 0
+
+stby_pin = 27
+mute_pin = 17
 
 max_sw = 16
 default_sw = 10
@@ -35,8 +38,6 @@ inputs = [
     0b01000100, 0b01000101, 0b01000110
 ]
 
-i2c_bus_init = I2C_bus.I2CBus_init()
-bus = i2c_bus_init.bus
 settings = settings.Settings()
 
 if os.path.exists("settings/settings.bin"):
@@ -47,14 +48,39 @@ if os.path.exists("settings/settings.bin"):
     except EOFError:
         os.remove("settings/settings.bin")
 
+logging.info("Starting remote amp...")
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(stby_pin, GPIO.OUT)
+GPIO.setup(mute_pin, GPIO.OUT)
+GPIO.output(stby_pin, GPIO.LOW)
+GPIO.output(mute_pin, GPIO.LOW)
+logging.info("Initializing bus...")
+bus = smbus2.SMBus(1)
+logging.info("Initialization complete")
+
+
+def start_bus(retry_counter):
+    logging.info("Enabling speakers...")
+    GPIO.output(stby_pin, GPIO.HIGH)
+    retry_counter += 1
+    try:
+        time.sleep(0.5)
+        bus.write_quick(DEVICE_ADDRESS)
+    except IOError:
+        logging.error(f"Failed to speakers. Retry count is: {retry_counter}")
+        if retry_counter < 10:
+            logging.info("Retry in 1 seconds...")
+            time.sleep(1)
+            start_bus(retry_counter)
+        else:
+            raise IOError
+
 
 def enable():
-    while i2c_bus_init.isInit is not True:
-        time.sleep(0.5)
-
-    GPIO.output(I2C_bus.stby_pin, GPIO.HIGH)
-
-    time.sleep(2)
+    try:
+        start_bus(0)
+    except IOError:
+        return 0
 
     # front attenuation set to 0
     bus.write_byte(DEVICE_ADDRESS, 0b10000000)
@@ -74,7 +100,7 @@ def enable():
     # set volume to -80dB
     bus.write_byte(DEVICE_ADDRESS, 0b00111111)
 
-    GPIO.output(I2C_bus.mute_pin, GPIO.HIGH)
+    GPIO.output(mute_pin, GPIO.HIGH)
 
     time.sleep(1)
 
@@ -92,10 +118,11 @@ def enable():
 def disable():
     logging.info("Shutting down remote amp...")
     decrease_volume(settings.volume, min_volume, real_volume)
-    GPIO.output(I2C_bus.mute_pin, GPIO.LOW)
-    GPIO.output(I2C_bus.stby_pin, GPIO.LOW)
+    GPIO.output(mute_pin, GPIO.LOW)
+    GPIO.output(stby_pin, GPIO.LOW)
     settings.enabled = 0
     print("disable")
+    return 1
 
 
 def set_volume(volume):
