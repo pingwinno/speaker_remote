@@ -35,3 +35,4 @@ httptools~=0.6.1
 watchfiles~=0.22.0
 python-multipart~=0.0.9
 Jinja2~=3.1.4
+gpiozero~=2.0.1
