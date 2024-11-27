@@ -3,7 +3,7 @@ import os
 import pickle
 import time
 
-import RPi.GPIO as GPIO
+from gpiozero import DigitalOutputDevice
 from smbus2 import smbus2
 
 import settings
@@ -49,11 +49,10 @@ if os.path.exists("settings/settings.bin"):
         os.remove("settings/settings.bin")
 
 logging.info("Starting remote amp...")
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(stby_pin, GPIO.OUT)
-GPIO.setup(mute_pin, GPIO.OUT)
-GPIO.output(stby_pin, GPIO.LOW)
-GPIO.output(mute_pin, GPIO.LOW)
+stby = DigitalOutputDevice(stby_pin)
+mute = DigitalOutputDevice(mute_pin)
+stby.off()
+mute.off()
 logging.info("Initializing bus...")
 bus = smbus2.SMBus(1)
 logging.info("Initialization complete")
@@ -61,7 +60,7 @@ logging.info("Initialization complete")
 
 def start_bus(retry_counter):
     logging.info("Enabling speakers...")
-    GPIO.output(stby_pin, GPIO.HIGH)
+    stby.on()
     retry_counter += 1
     try:
         time.sleep(0.5)
@@ -100,7 +99,7 @@ def enable():
     # set volume to -80dB
     bus.write_byte(DEVICE_ADDRESS, 0b00111111)
 
-    GPIO.output(mute_pin, GPIO.HIGH)
+    mute.on()
 
     time.sleep(1)
 
@@ -118,8 +117,8 @@ def enable():
 def disable():
     logging.info("Shutting down remote amp...")
     decrease_volume(settings.volume, min_volume, real_volume)
-    GPIO.output(mute_pin, GPIO.LOW)
-    GPIO.output(stby_pin, GPIO.LOW)
+    mute.off()
+    stby.off()
     settings.enabled = 0
     print("disable")
     return 1
